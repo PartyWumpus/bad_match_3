@@ -67,21 +67,20 @@ impl Cell {
 }
 
 impl CellGrid {
-
-    fn filled_grid_random(length:usize, width: usize) -> Array2D<Option<Cell>> {
-        Array2D::filled_by_column_major(Cell::new_random, length, width)
+    fn filled_grid_random(height: usize, width: usize) -> Array2D<Option<Cell>> {
+        Array2D::filled_by_column_major(Cell::new_random, height, width)
     }
 
-    fn new(length: usize, width: usize, debug_info: bool, game_speed: u64) -> Self {
+    fn new(height: usize, width: usize, debug_info: bool, game_speed: u64) -> Self {
         Self {
-            grid: CellGrid::filled_grid_random(length, width),
+            grid: CellGrid::filled_grid_random(height, width),
             score: 0,
             debug_info,
             game_speed,
         }
     }
 
-    fn play_game(&mut self) {
+    fn user_play_game(&mut self) {
         loop {
             self.resolve_state();
             self.make_move();
@@ -91,7 +90,44 @@ impl CellGrid {
     fn screensaver(&mut self) {
         loop {
             self.resolve_state();
-            self.grid = Self::filled_grid_random(self.grid.row_len(), self.grid.column_len());
+            self.grid = Self::filled_grid_random(self.grid.column_len(), self.grid.row_len());
+        }
+    }
+
+    fn faster_screensaver(&mut self) {
+        loop {
+            self.delete_matches(true);
+            self.print("nyoom", 10);
+            self.do_gravity(true);
+            self.grid = Self::filled_grid_random(self.grid.column_len(), self.grid.row_len());
+        }
+    }
+
+    fn auto_play_game(&mut self) {
+        loop {
+            let mut best_score: usize = 0;
+            let mut best_move: (usize, usize, usize, usize) = (0, 0, 0, 0);
+            for col_index in 0..self.grid.row_len() {
+                for row_index in 0..self.grid.column_len() {
+                    for x in [
+                        (col_index, row_index, col_index + 1, row_index),
+                        (col_index, row_index, col_index - 1, row_index),
+                        (col_index, row_index, col_index, row_index + 1),
+                        (col_index, row_index, col_index, row_index - 1),
+                    ] {
+                        self.swap(x.0, x.1, x.2, x.3);
+                        let count = self.count_matches();
+                        if count > best_score {
+                            best_score = count;
+                            best_move = x
+                        }
+                        self.swap(x.0, x.1, x.2, x.3);
+                    }
+                }
+            }
+            let x = best_move;
+            self.swap(x.0, x.1, x.2, x.3);
+            self.resolve_state();
         }
     }
 
@@ -101,19 +137,39 @@ impl CellGrid {
             println!("(In the form 'x1 y1 x2 y2', eg '0 1 0 0': ");
             let (row1, col1, row2, col2): (i64, i64, i64, i64);
             text_io::scan!("{} {} {} {}", row1, col1, row2, col2);
-            println!("{}, {}, {}, {}, {}, {}", row1, col1, row2, col2, (row1 - row2).abs(), (col1 - col2).abs());
+            println!(
+                "{}, {}, {}, {}, {}, {}",
+                row1,
+                col1,
+                row2,
+                col2,
+                (row1 - row2).abs(),
+                (col1 - col2).abs()
+            );
             if (row1 == row2 && (col1 - col2).abs() == 1)
                 || (col1 == col2 && (row1 - row2).abs() == 1)
             {
-                let mut temp = None;
-                let first = self.grid.get_mut(row1.try_into().unwrap(), col1.try_into().unwrap()).unwrap();
-                std::mem::swap(&mut temp, first);
-                let second = self
-                    .grid
-                    .get_mut(row2.try_into().unwrap(), col2.try_into().unwrap()).unwrap();
-                std::mem::swap(&mut temp, second);
-                self.grid.set(row1.try_into().unwrap(), col1.try_into().unwrap(), temp);
+                self.swap(
+                    row1.try_into().unwrap(),
+                    col1.try_into().unwrap(),
+                    row2.try_into().unwrap(),
+                    col2.try_into().unwrap(),
+                );
                 break;
+            }
+        }
+    }
+
+    fn swap(&mut self, row1: usize, col1: usize, row2: usize, col2: usize) {
+        let mut temp = None;
+        if let Some(first) = self.grid.get_mut(row1, col1) {
+            std::mem::swap(&mut temp, first);
+            if let Some(second) = self.grid.get_mut(row2, col2) {
+                std::mem::swap(&mut temp, second);
+                self.grid.set(row1, col1, temp);
+            } else {
+                let first = self.grid.get_mut(row1, col1).expect("already opened this before");
+                std::mem::swap(&mut temp, first);
             }
         }
     }
@@ -144,6 +200,22 @@ impl CellGrid {
             }
         }
         self.print("final", 0);
+    }
+
+    fn count_matches(&mut self) -> usize {
+        self.grid
+            .columns_iter()
+            .enumerate()
+            .flat_map(check_line)
+            .collect::<Vec<_>>()
+            .len()
+            + self
+                .grid
+                .rows_iter()
+                .enumerate()
+                .flat_map(check_line)
+                .collect::<Vec<_>>()
+                .len()
     }
 
     fn delete_matches(&mut self, print: bool) -> bool {
@@ -179,7 +251,9 @@ impl CellGrid {
             score += row_match.length;
         }
 
-        if print { self.print("matches found", 10) };
+        if print {
+            self.print("matches found", 10)
+        };
 
         for row in 0..self.grid.column_len() {
             for col in 0..self.grid.row_len() {
@@ -193,7 +267,9 @@ impl CellGrid {
             }
         }
 
-        if print { self.print("matches deleted", 10) };
+        if print {
+            self.print("matches deleted", 10)
+        };
 
         self.score += (score) * (score + 1) / 2;
         return score != 0;
@@ -228,7 +304,9 @@ impl CellGrid {
                 }
             }
         }
-        if print { self.print("gravity step", 3) };
+        if print {
+            self.print("gravity step", 3)
+        };
         swap_performed
     }
 
@@ -249,42 +327,50 @@ impl CellGrid {
                 //self.grid.set(0, index, Some(Cell { color: Color::Green}));
             }
         }
-        if print { self.print("add row", 5) };
+        if print {
+            self.print("add row", 5)
+        };
         result
     }
 
     fn print(&self, step: &str, time: u64) {
         let stdout = io::stdout();
-        let mut handle = io::BufWriter::new(stdout.lock());
+        let buf_size = (self.grid.row_len() + 3) * (self.grid.column_len() + 3) * 2;
+        let mut handle = termion::cursor::HideCursor::from(io::BufWriter::with_capacity(
+            buf_size,
+            stdout.lock(),
+        ));
         std::thread::sleep(std::time::Duration::from_millis(time * self.game_speed));
-        let mut str: String = String::new();
-        str.push_str(&format!("score: {}\n", self.score));
+        //write!(handle, "{esc}c", esc = 27 as char); // clear
+        writeln!(handle, "{}", termion::cursor::Goto(1, 1));
+        writeln!(handle, "score: {}\n", self.score);
         if self.debug_info {
-            str.push_str(&format!("step: {}\n", step))
+            writeln!(handle, "step: {}\n", step);
         };
 
         //TODO: fix column names vertically when >9
         //let height = (self.grid.row_len().ilog10() + 1) as usize;
 
-        str.push_str("\n  ");
+        write!(handle, "\n  ");
         for i in 0..self.grid.row_len() {
-            str.push_str(&format!("{} ", i))
+            write!(handle, "{} ", i);
         }
-        str.push_str("\n");
+        writeln!(handle);
 
         let len = (self.grid.column_len().ilog10() + 1) as usize;
         self.grid
             .rows_iter()
             .enumerate()
             .for_each(|(row_index, row)| {
-                str.push_str(&format!("{:0width$} ", row_index, width = len));
-                row.for_each(|x| str.push_str(&fmt_cell(x)));
-                str.push_str("\n");
+                write!(handle, "{:0width$} ", row_index, width = len);
+                row.for_each(|x| {
+                    write!(handle, "{}", fmt_cell(x));
+                });
+                writeln!(handle);
+                //std::thread::sleep(std::time::Duration::from_millis(1));
             });
         //clearscreen::clear();
-        print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-        std::thread::sleep(std::time::Duration::from_millis(120));
-        print!("{str}");
+        handle.flush();
     }
 }
 
@@ -335,7 +421,11 @@ where
 
 fn main() {
     println!("Hello, world!");
-    let mut grid = CellGrid::new(300, 300, true, 10);
-    //grid.play_game();
-    grid.screensaver();
+    clearscreen::clear();
+    let mut grid = CellGrid::new(28, 18, false, 5);
+    //let mut grid = CellGrid::new(380, 480, true, 1);
+    //grid.auto_play_game(); //TODO: search more than just next step for better moves
+    //grid.user_play_game();
+    //grid.screensaver();
+    grid.faster_screensaver();
 }

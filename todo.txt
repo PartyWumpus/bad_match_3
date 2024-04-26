@@ -1,0 +1,2 @@
+figure out how to reduce stutter at very large sizes. 
+try doing no clearing, just resetting the cursor back to the top of the text
