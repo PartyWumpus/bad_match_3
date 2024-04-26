@@ -7,7 +7,9 @@ edition = "2021"
 
 [dependencies]
 array2d = "0.3.2"
+clearscreen = "3.0.0"
 colored = "2.1.0"
 itertools = "0.12.1"
 rand = "0.8.5"
 rand_derive2 = "0.1.21"
+text_io = "0.1.12"
