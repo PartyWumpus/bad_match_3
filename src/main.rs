@@ -96,9 +96,12 @@ impl CellGrid {
     }
 
     fn user_play_game(&mut self) {
+        self.resolve_state(false);
+        self.score = 0;
+        self.print("initial", 5);
         loop {
-            self.resolve_state(true);
             self.make_move();
+            self.resolve_state(true);
         }
     }
 
@@ -150,8 +153,8 @@ impl CellGrid {
         loop {
             println!("Please enter the two elements you would like to swap");
             println!("(In the form 'x1 y1 x2 y2', eg '0 1 0 0': ");
-            let (row1, col1, row2, col2): (i64, i64, i64, i64);
-            text_io::scan!("{} {} {} {}", row1, col1, row2, col2);
+            let (col1, row1, col2, row2): (i64, i64, i64, i64);
+            text_io::scan!("{} {} {} {}", col1, row1, col2, row2);
             println!(
                 "{}, {}, {}, {}, {}, {}",
                 row1,
@@ -195,7 +198,7 @@ impl CellGrid {
     }
 
     fn resolve_state(&mut self, print: bool) {
-        self.print("init", 10);
+        if print { self.print("init", 10) };
         'main: loop {
             'clear_matches: loop {
                 if !self.delete_matches(print) {
@@ -219,7 +222,7 @@ impl CellGrid {
                 self.do_gravity_step(false);
             }
         }
-        self.print("final", 0);
+        if print { self.print("final", 0) };
     }
 
     fn count_matches(&mut self) -> usize {
@@ -441,9 +444,8 @@ where
 }
 
 fn main() {
-    println!("Hello, world!");
     let _ = clearscreen::clear();
-    let mut game = CellGrid::new(28, 18, true, true, 2);
+    let mut game = CellGrid::new(400, 1000, true, true, 0);
     let choice = text_io::read!();
     match choice {
         0 => game.auto_play_game(), //TODO: search more than just next step for better moves
